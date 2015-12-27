@@ -1,0 +1,123 @@
+---
+title: "Practical Machine Learning - Assignment Writeup"
+author: "Alvin Yu"
+date: "December 27, 2015"
+output: html_document
+---
+
+##1. Executive Summary
+
+In this report we aim to create a machine learning algorithm with the goal of predicting the manner in which an exercise was carried out. 
+
+The data for this project come from [this source](http://groupware.les.inf.puc-rio.br/har). We will be using data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants who were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+The goal is to predict the manner in which they did the exercise, which is the 'classe' variable in the dataset(s).
+
+
+##2. Data Processing and Exploratory Assessment
+
+Loading the required packages:
+
+```{r, warning=FALSE, message=FALSE}
+library(caret)
+library(randomForest)
+
+```
+
+The training data for this project are available [here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv).
+
+The test data are available [here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv).
+
+Once the data has been dowloaded to the working directory, we read the files in as follows:
+
+```{r}
+trainingraw<-read.csv("pml-training.csv", na.strings=c("","NA","NULL"))
+testingraw<-read.csv("pml-testing.csv",na.strings=c("","NA","NULL"))
+dim(trainingraw);dim(testingraw)
+```
+
+We note that we have almost 160 variables in both training and test datasets.
+
+Removing variables that have NA values:
+```{r}
+trainingclean<-trainingraw[,colSums(is.na(trainingraw))==0]
+testingclean<-testingraw[,colSums(is.na(testingraw))==0]
+dim(trainingclean);dim(testingclean)
+```
+
+We find we are left with 60 variables to work with.
+
+Reviewing the names of the remaining variables:
+```{r}
+names(trainingclean)
+```
+
+We find that the first 7 variables are potentially only labels that are not relevant to the final outcome 'classe' e.g. timestamps, user names, windows etc. so we remove these for our analysis.
+```{r}
+names(trainingclean[,1:7])
+trainingfinal<-trainingclean[,-c(1:7)]
+testingfinal<-testingclean[,-c(1:7)]
+dim(trainingfinal); dim(testingfinal)
+```
+
+We are left with 53 variables that are free of missing values and that are potentially relevant to our purposes.
+
+##3. Modelling
+
+Using the trainingfinal dataset, we split this dataset into further training and test sets which we will use for model building:
+
+```{r}
+set.seed(1234)
+inTrain<-createDataPartition(y=trainingfinal$classe,p=0.7,list=FALSE)
+train<-trainingfinal[inTrain,]
+test<-trainingfinal[-inTrain,]
+dim(train);dim(test)
+```
+
+We not have 13737 samples which we will use to build our model on and the remaining 5885 samples we will test our model on.
+
+We fit a predictive model using the Random Forest algorithm using 5 fold cross validation when applying the algorithm:
+
+```{r,cache=TRUE}
+set.seed(1234)
+modelFit <- train(classe~., data=train, method = "rf",trControl=trainControl(method="cv",number=5),ntree=250)
+```
+
+Using the fitted model to predict based on our test set:
+```{r}
+prediction<-predict(modelFit,newdata=test)
+matrix<-confusionMatrix(prediction,test$classe)
+matrix
+```
+
+We find that the accuracy of the model is 99.37% which gives us an expected out of sample error rate of 0.63%.
+
+##4. Conclusion
+
+Using our prediction model against the final testing model we created:
+
+```{r}
+result<-predict(modelFit,newdata=testingfinal)
+result
+```
+
+These will be the final answers submitted for grading and based on the resulting full score of 20/20, the model has proven to be highly accurate.
+
+\pagebreak
+
+##APPENDIX (1/1)
+
+The following script was used to obtain text files to be uploaded to the course website for automatic grading:
+```{r, eval=FALSE}
+getwd()
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(result)
+```
+
+
